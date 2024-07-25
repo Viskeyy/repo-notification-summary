@@ -59,10 +59,9 @@ export async function POST(request: NextRequest) {
     const { prompt } = await request.json();
 
     try {
-        const res = await ollama.generate({
+        const res = await ollama.chat({
             model: 'mistral:7b',
-            prompt: prompt,
-            system: systemPrompt,
+            messages: [{ role: 'user', content: systemPrompt }],
         });
 
         return new NextResponse(JSON.stringify(res), { status: 200 });
