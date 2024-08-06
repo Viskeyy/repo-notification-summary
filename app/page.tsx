@@ -1,51 +1,51 @@
 'use client';
-// import { marked } from 'marked';
-import { useState } from 'react';
-
-const fetchData = async () => {
-    const res = await fetch('http://localhost:3000/api/ollama', {
-        method: 'POST',
-        body: JSON.stringify({
-            // prompt: 'Summary the given Github event data',
-            prompt: '',
-        }),
-    });
-
-    const data = await res.json();
-
-    return data.response;
-};
+import { marked } from 'marked';
+import { useEffect, useState } from 'react';
 
 export default function Home() {
-    const [summaryData, setSummaryData] = useState('');
+    const [data, setData] = useState<string>('');
 
-    const getParsedData = async () => {
-        const data = await fetchData();
-        console.log(data, '\n\nfetch data');
+    const fetchData = async () => {
+        const response = await fetch('http://localhost:3000/api/chat');
+        if (response.status !== 200) return;
 
-        // setSummaryData(data);
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder('utf-8');
 
-        // return marked.parse(data);
+        let chunkString = '';
+
+        while (true) {
+            const { done, value } = await reader?.read()!;
+
+            if (done) break;
+
+            const chunk = decoder.decode(value, { stream: true });
+
+            chunkString += chunk;
+
+            const chunkArray = chunkString.split('\n');
+
+            for (let i = 0; i < chunkArray.length - 1; i++) {
+                const line = chunkArray[i].trim();
+                if (line.startsWith('data: ')) {
+                    const temp = JSON.parse(line.slice(6));
+                    const content = temp.choices[0].delta.content;
+                    setData((prev) => (content ? prev + content : prev));
+                }
+            }
+
+            chunkString = chunkArray[chunkArray.length - 1];
+        }
     };
 
-    // const summaryData = getParsedData();
-
-    const temp = async () => {
-        const tt = await getParsedData();
-        console.log(tt);
-    };
-
-    temp();
-    getParsedData();
+    useEffect(() => {
+        fetchData();
+    }, []);
 
     return (
         <main className='flex min-h-screen flex-col items-center justify-between p-24'>
-            {/* <div
-                className='prose-light prose prose-sm'
-                dangerouslySetInnerHTML={{ __html: marked.parse(summaryData) }}
-            /> */}
-
-            {/* {summaryData && <div>{summaryData}</div>} */}
+            <div dangerouslySetInnerHTML={{ __html: marked(data) }}></div>
+            111
         </main>
     );
 }
