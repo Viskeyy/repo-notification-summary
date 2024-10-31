@@ -22,7 +22,7 @@ export default function Home() {
             const response = await fetch('/api/webhook');
             const data = await response.json();
             setWebhookData(JSON.stringify(data));
-        } catch (error) {
+        } catch {
             alert('Error fetching data from webhook database. \n Please refresh the page and try again.');
             window.location.reload();
         }
