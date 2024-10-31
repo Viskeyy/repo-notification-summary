@@ -28,7 +28,9 @@ export default function Home() {
         }
     };
 
-    const submitMessages = async (messages: Message[]) => {
+    const submitMessages = async (inputMessages: Message) => {
+        const systemMessage = { role: 'system', content: systemPrompt(webhookData), id: generateRandomId() };
+
         setLoading(true);
 
         try {
@@ -38,7 +40,7 @@ export default function Home() {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    messages: messages.map((message) => ({
+                    messages: [systemMessage, inputMessages].map((message) => ({
                         role: message.role,
                         content: message.content,
                     })),
@@ -47,14 +49,13 @@ export default function Home() {
 
             if (response.status !== 200) {
                 const error = await response.json();
-                setMessages([
-                    ...messages,
+                setMessages((prev) => [
+                    ...prev,
                     { role: 'assistant', content: 'Error: ' + error.message, id: generateRandomId() },
                 ]);
-                return;
             }
 
-            setMessages([...messages, { role: 'assistant', content: '', id: generateRandomId() }]);
+            setMessages((prev) => [...prev, { role: 'assistant', content: '', id: generateRandomId() }]);
 
             const reader = response.body?.getReader();
             if (!reader) throw new Error('Response body is not readable');
@@ -107,43 +108,32 @@ export default function Home() {
             }
         } catch (error) {
             console.error('Error:', error);
+
+            setMessages((prev) => [
+                ...prev,
+                { role: 'assistant', content: 'Error occurred while processing your request.', id: generateRandomId() },
+            ]);
         } finally {
             setLoading(false);
         }
     };
 
-    const onInputSubmit =
-        (role: 'user' | 'system') => (event: React.KeyboardEvent<HTMLInputElement>, inputValue: string) => {
-            if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-                event.preventDefault();
-                const newMessage = { role: role, content: inputValue, id: generateRandomId() };
+    const onInputSubmit = (role: 'user') => (event: React.KeyboardEvent<HTMLInputElement>, inputValue: string) => {
+        if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+            event.preventDefault();
+            const newMessage = { role: role, content: inputValue, id: generateRandomId() };
 
-                if (role === 'user') {
-                    const tempMessages =
-                        messages[messages.length - 1]?.content === inputValue ? messages : [...messages, newMessage];
-                    setMessages(tempMessages);
-                    submitMessages(tempMessages);
-                } else {
-                    setMessages([newMessage]);
-                    submitMessages([newMessage]);
-                }
-            }
-        };
+            setMessages((prev) => [...prev, newMessage]);
+
+            submitMessages(newMessage);
+        }
+    };
 
     useEffect(() => {
-        if (messages.length >= 20) {
-            alert(`You have reached the maximum number of messages, Please reload the page to clear the messages.`);
-            window.location.reload();
-        }
-
         if (messagesRef?.current) {
             messagesRef.current.scrollTop = messagesRef.current.scrollHeight;
         }
     }, [messages.length]);
-
-    useEffect(() => {
-        setMessages([{ role: 'system', content: systemPrompt(webhookData), id: generateRandomId() }]);
-    }, [webhookData]);
 
     useEffect(() => {
         fetchWebhookData();
@@ -166,7 +156,7 @@ export default function Home() {
                 )}
             </div>
             <Input
-                label='The maximum number of messages is 20'
+                label='Ask something about your repo webhook data'
                 placeholder='Enter your prompt here'
                 onKeyDown={onInputSubmit('user')}
                 disabled={loading}
